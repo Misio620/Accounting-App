@@ -1,25 +1,46 @@
-# Python 相關
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# 資料庫檔案
+# Database files
 *.db
 *.sqlite
 *.sqlite3
-accounting.db
 test_*.db
 
-# IDE 設定
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# 系統檔案
+# OS
 .DS_Store
 Thumbs.db
 
-# 暫存檔案
-*.tmp
-*.bak
+# Logs
+*.log
+
+# Environment
+.env
+.venv
+env/
+venv/

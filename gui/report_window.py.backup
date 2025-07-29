@@ -1,0 +1,469 @@
+"""
+記帳應用程式 - 圖表報表視窗
+提供收支趨勢圖、分類占比圓餅圖等視覺化報表功能
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import sys
+import os
+from datetime import datetime, timedelta
+from collections import defaultdict
+import calendar
+
+# 將專案根目錄加入路徑
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.figure import Figure
+    import matplotlib.dates as mdates
+    from matplotlib import font_manager
+    
+    # 設定中文字體
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
+    plt.rcParams['axes.unicode_minus'] = False
+    
+except ImportError:
+    plt = None
+
+from database.models import DatabaseManager, CategoryManager, TransactionManager
+
+class ReportWindow:
+    """圖表報表視窗類別"""
+    
+    def __init__(self, parent):
+        if plt is None:
+            messagebox.showerror("錯誤", 
+                "圖表功能需要安裝 matplotlib 套件\n\n" +
+                "請在終端機執行：pip install matplotlib")
+            return
+        
+        self.parent = parent
+        
+        # 初始化資料庫管理器
+        self.db_manager = DatabaseManager("accounting.db")
+        self.category_manager = CategoryManager(self.db_manager)
+        self.transaction_manager = TransactionManager(self.db_manager)
+        
+        # 建立報表視窗
+        self.window = tk.Toplevel(parent)
+        self.window.title("圖表報表")
+        self.window.geometry("1000x700")
+        self.window.transient(parent)
+        
+        self.setup_ui()
+        self.center_window()
+        
+        # 載入預設報表
+        self.show_monthly_trend()
+    
+    def center_window(self):
+        """將視窗置中顯示"""
+        self.window.update_idletasks()
+        x = (self.window.winfo_screenwidth() // 2) - (1000 // 2)
+        y = (self.window.winfo_screenheight() // 2) - (700 // 2)
+        self.window.geometry(f"1000x700+{x}+{y}")
+    
+    def setup_ui(self):
+        """設定報表界面"""
+        # 主框架
+        main_frame = ttk.Frame(self.window, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # 標題
+        title_label = ttk.Label(main_frame, text="圖表報表", font=("Arial", 16, "bold"))
+        title_label.grid(row=0, column=0, columnspan=4, pady=10)
+        
+        # 控制面板
+        control_frame = ttk.LabelFrame(main_frame, text="報表選項", padding="10")
+        control_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=10)
+        
+        # 報表類型選擇
+        ttk.Label(control_frame, text="報表類型:").grid(row=0, column=0, padx=5)
+        self.report_type_var = tk.StringVar(value="monthly_trend")
+        report_combo = ttk.Combobox(control_frame, textvariable=self.report_type_var, 
+                                   values=[
+                                       ("monthly_trend", "月度收支趨勢"),
+                                       ("category_pie", "分類支出占比"),
+                                       ("income_expense_bar", "收支對比柱狀圖"),
+                                       ("daily_trend", "近30天趨勢")
+                                   ], state="readonly", width=20)
+        report_combo.grid(row=0, column=1, padx=5)
+        
+        # 時間範圍選擇
+        ttk.Label(control_frame, text="時間範圍:").grid(row=0, column=2, padx=5)
+        self.time_range_var = tk.StringVar(value="6months")
+        time_combo = ttk.Combobox(control_frame, textvariable=self.time_range_var,
+                                 values=[
+                                     ("3months", "近3個月"),
+                                     ("6months", "近6個月"),
+                                     ("12months", "近12個月"),
+                                     ("current_year", "本年度")
+                                 ], state="readonly", width=15)
+        time_combo.grid(row=0, column=3, padx=5)
+        
+        # 按鈕區域
+        button_frame = ttk.Frame(control_frame)
+        button_frame.grid(row=1, column=0, columnspan=4, pady=10)
+        
+        ttk.Button(button_frame, text="產生報表", command=self.generate_report).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="匯出圖表", command=self.export_chart).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="重新整理", command=self.refresh_data).pack(side=tk.LEFT, padx=5)
+        
+        # 圖表顯示區域
+        self.chart_frame = ttk.LabelFrame(main_frame, text="圖表顯示", padding="5")
+        self.chart_frame.grid(row=2, column=0, columnspan=4, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+        
+        # 設定網格權重
+        self.window.columnconfigure(0, weight=1)
+        self.window.rowconfigure(0, weight=1)
+        main_frame.columnconfigure(3, weight=1)
+        main_frame.rowconfigure(2, weight=1)
+        self.chart_frame.columnconfigure(0, weight=1)
+        self.chart_frame.rowconfigure(0, weight=1)
+    
+    def get_monthly_data(self, months_back=6):
+        """取得月度統計資料"""
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=months_back * 30)
+        
+        # 取得指定時間範圍的交易記錄
+        transactions = self.transaction_manager.get_transactions_by_date_range(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        # 按月份統計
+        monthly_data = defaultdict(lambda: {'income': 0, 'expense': 0})
+        
+        for trans in transactions:
+            # 解析日期取得年月
+            trans_date = datetime.strptime(trans['date'], '%Y-%m-%d')
+            month_key = trans_date.strftime('%Y-%m')
+            
+            if trans['type'] == 'income':
+                monthly_data[month_key]['income'] += trans['amount']
+            else:
+                monthly_data[month_key]['expense'] += trans['amount']
+        
+        return dict(monthly_data)
+    
+    def get_category_data(self):
+        """取得分類統計資料"""
+        # 取得近6個月的支出資料
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=180)
+        
+        transactions = self.transaction_manager.get_transactions_by_date_range(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        # 統計各分類支出
+        category_data = defaultdict(float)
+        for trans in transactions:
+            if trans['type'] == 'expense':
+                category_data[trans['category_name']] += trans['amount']
+        
+        return dict(category_data)
+    
+    def show_monthly_trend(self):
+        """顯示月度收支趨勢圖"""
+        # 清除現有圖表
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # 取得資料
+        time_range_map = {
+            "3months": 3,
+            "6months": 6,
+            "12months": 12,
+            "current_year": 12
+        }
+        months = time_range_map.get(self.time_range_var.get(), 6)
+        monthly_data = self.get_monthly_data(months)
+        
+        if not monthly_data:
+            ttk.Label(self.chart_frame, text="沒有資料可顯示", 
+                     font=("Arial", 12)).pack(expand=True)
+            return
+        
+        # 建立圖表
+        fig = Figure(figsize=(10, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # 準備資料
+        months_list = sorted(monthly_data.keys())
+        income_list = [monthly_data[month]['income'] for month in months_list]
+        expense_list = [monthly_data[month]['expense'] for month in months_list]
+        
+        # 繪製折線圖
+        ax.plot(months_list, income_list, marker='o', linewidth=2, 
+                label='收入', color='green', markersize=6)
+        ax.plot(months_list, expense_list, marker='s', linewidth=2, 
+                label='支出', color='red', markersize=6)
+        
+        # 設定圖表
+        ax.set_title('月度收支趨勢圖', fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel('月份', fontsize=12)
+        ax.set_ylabel('金額 (元)', fontsize=12)
+        ax.legend(fontsize=10)
+        ax.grid(True, alpha=0.3)
+        
+        # 格式化X軸標籤
+        ax.tick_params(axis='x', rotation=45)
+        
+        # 調整佈局
+        fig.tight_layout()
+        
+        # 顯示圖表
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # 儲存圖表以供匯出
+        self.current_figure = fig
+    
+    def show_category_pie(self):
+        """顯示分類支出占比圓餅圖"""
+        # 清除現有圖表
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # 取得資料
+        category_data = self.get_category_data()
+        
+        if not category_data:
+            ttk.Label(self.chart_frame, text="沒有支出資料可顯示", 
+                     font=("Arial", 12)).pack(expand=True)
+            return
+        
+        # 建立圖表
+        fig = Figure(figsize=(10, 8), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # 準備資料（只顯示前8大分類，其他合併為"其他"）
+        sorted_data = sorted(category_data.items(), key=lambda x: x[1], reverse=True)
+        
+        if len(sorted_data) > 8:
+            main_categories = sorted_data[:7]
+            other_amount = sum(amount for _, amount in sorted_data[7:])
+            main_categories.append(('其他', other_amount))
+        else:
+            main_categories = sorted_data
+        
+        labels = [cat for cat, _ in main_categories]
+        sizes = [amount for _, amount in main_categories]
+        
+        # 設定顏色
+        colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3', '#54A0FF', '#5F27CD']
+        
+        # 繪製圓餅圖
+        wedges, texts, autotexts = ax.pie(sizes, labels=labels, colors=colors[:len(labels)], 
+                                         autopct='%1.1f%%', startangle=90, 
+                                         textprops={'fontsize': 10})
+        
+        # 設定圖表
+        ax.set_title('分類支出占比圖', fontsize=14, fontweight='bold', pad=20)
+        
+        # 調整佈局
+        fig.tight_layout()
+        
+        # 顯示圖表
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # 儲存圖表以供匯出
+        self.current_figure = fig
+    
+    def show_income_expense_bar(self):
+        """顯示收支對比柱狀圖"""
+        # 清除現有圖表
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # 取得資料
+        time_range_map = {
+            "3months": 3,
+            "6months": 6,
+            "12months": 12,
+            "current_year": 12
+        }
+        months = time_range_map.get(self.time_range_var.get(), 6)
+        monthly_data = self.get_monthly_data(months)
+        
+        if not monthly_data:
+            ttk.Label(self.chart_frame, text="沒有資料可顯示", 
+                     font=("Arial", 12)).pack(expand=True)
+            return
+        
+        # 建立圖表
+        fig = Figure(figsize=(12, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # 準備資料
+        months_list = sorted(monthly_data.keys())
+        income_list = [monthly_data[month]['income'] for month in months_list]
+        expense_list = [monthly_data[month]['expense'] for month in months_list]
+        
+        # 設定柱狀圖位置
+        x = range(len(months_list))
+        width = 0.35
+        
+        # 繪製柱狀圖
+        bars1 = ax.bar([i - width/2 for i in x], income_list, width, 
+                      label='收入', color='lightgreen', alpha=0.8)
+        bars2 = ax.bar([i + width/2 for i in x], expense_list, width, 
+                      label='支出', color='lightcoral', alpha=0.8)
+        
+        # 在柱子上顯示數值
+        for bar in bars1:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + max(income_list) * 0.01,
+                       f'{height:.0f}', ha='center', va='bottom', fontsize=8)
+        
+        for bar in bars2:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width()/2., height + max(expense_list) * 0.01,
+                       f'{height:.0f}', ha='center', va='bottom', fontsize=8)
+        
+        # 設定圖表
+        ax.set_title('月度收支對比圖', fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel('月份', fontsize=12)
+        ax.set_ylabel('金額 (元)', fontsize=12)
+        ax.set_xticks(x)
+        ax.set_xticklabels(months_list, rotation=45)
+        ax.legend()
+        ax.grid(True, alpha=0.3, axis='y')
+        
+        # 調整佈局
+        fig.tight_layout()
+        
+        # 顯示圖表
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # 儲存圖表以供匯出
+        self.current_figure = fig
+    
+    def show_daily_trend(self):
+        """顯示近30天收支趨勢"""
+        # 清除現有圖表
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        
+        # 取得近30天資料
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        
+        transactions = self.transaction_manager.get_transactions_by_date_range(
+            start_date.strftime('%Y-%m-%d'),
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        if not transactions:
+            ttk.Label(self.chart_frame, text="沒有資料可顯示", 
+                     font=("Arial", 12)).pack(expand=True)
+            return
+        
+        # 按天統計
+        daily_data = defaultdict(lambda: {'income': 0, 'expense': 0})
+        
+        for trans in transactions:
+            daily_data[trans['date']][trans['type']] += trans['amount']
+        
+        # 建立圖表
+        fig = Figure(figsize=(12, 6), dpi=100)
+        ax = fig.add_subplot(111)
+        
+        # 準備資料
+        dates = sorted(daily_data.keys())
+        income_list = [daily_data[date]['income'] for date in dates]
+        expense_list = [daily_data[date]['expense'] for date in dates]
+        
+        # 轉換日期格式
+        date_objects = [datetime.strptime(date, '%Y-%m-%d') for date in dates]
+        
+        # 繪製面積圖
+        ax.fill_between(date_objects, income_list, alpha=0.6, color='green', label='收入')
+        ax.fill_between(date_objects, expense_list, alpha=0.6, color='red', label='支出')
+        
+        # 設定圖表
+        ax.set_title('近30天收支趨勢圖', fontsize=14, fontweight='bold', pad=20)
+        ax.set_xlabel('日期', fontsize=12)
+        ax.set_ylabel('金額 (元)', fontsize=12)
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # 格式化日期軸
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=5))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45)
+        
+        # 調整佈局
+        fig.tight_layout()
+        
+        # 顯示圖表
+        canvas = FigureCanvasTkAgg(fig, self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # 儲存圖表以供匯出
+        self.current_figure = fig
+    
+    def generate_report(self):
+        """根據選擇產生對應報表"""
+        report_type = self.report_type_var.get()
+        
+        if report_type == "monthly_trend":
+            self.show_monthly_trend()
+        elif report_type == "category_pie":
+            self.show_category_pie()
+        elif report_type == "income_expense_bar":
+            self.show_income_expense_bar()
+        elif report_type == "daily_trend":
+            self.show_daily_trend()
+    
+    def export_chart(self):
+        """匯出當前圖表"""
+        if not hasattr(self, 'current_figure'):
+            messagebox.showwarning("提醒", "請先產生圖表")
+            return
+        
+        from tkinter import filedialog
+        
+        filename = filedialog.asksaveasfilename(
+            title="匯出圖表",
+            defaultextension=".png",
+            filetypes=[
+                ("PNG 圖片", "*.png"),
+                ("JPG 圖片", "*.jpg"),
+                ("PDF 檔案", "*.pdf"),
+                ("SVG 向量圖", "*.svg")
+            ]
+        )
+        
+        if filename:
+            try:
+                self.current_figure.savefig(filename, dpi=300, bbox_inches='tight')
+                messagebox.showinfo("成功", f"圖表已匯出到：\n{filename}")
+            except Exception as e:
+                messagebox.showerror("錯誤", f"匯出失敗：{str(e)}")
+    
+    def refresh_data(self):
+        """重新整理資料"""
+        self.generate_report()
+
+def show_report_window(parent):
+    """顯示報表視窗"""
+    try:
+        ReportWindow(parent)
+    except Exception as e:
+        messagebox.showerror("錯誤", f"開啟報表視窗失敗：{str(e)}")
+        

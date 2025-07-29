@@ -1,0 +1,25 @@
+# Python 相關
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# 資料庫檔案
+*.db
+*.sqlite
+*.sqlite3
+accounting.db
+test_*.db
+
+# IDE 設定
+.vscode/
+.idea/
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# 暫存檔案
+*.tmp
+*.bak

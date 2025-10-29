@@ -1059,87 +1059,6 @@ class MainWindow:
         # 啟動主迴圈
         self.root.mainloop()
 
-def main():
-    """主程式入口"""
-    try:
-        print("正在啟動個人記帳本...")
-        app = MainWindow()
-        app.run()
-    except KeyboardInterrupt:
-        print("\n程式被使用者中斷")
-    except Exception as e:
-        print(f"程式執行錯誤：{e}")
-        import traceback
-        traceback.print_exc()
-        input("按 Enter 鍵退出...")
-
-        transactions = self.transaction_manager.get_transactions_by_date_range(start_date, end_date)
-        
-        if not transactions:
-            ttk.Label(self.report_display_frame, text="無資料可顯示").pack(pady=20)
-            return
-        
-        # 統計資料
-        expense_stats = defaultdict(float)
-        income_stats = defaultdict(float)
-        
-        for trans in transactions:
-            if trans['type'] == 'expense':
-                expense_stats[trans['category_name']] += trans['amount']
-            else:
-                income_stats[trans['category_name']] += trans['amount']
-        
-        # 建立圖表
-        fig = Figure(figsize=(12, 6), dpi=80)
-        
-        if expense_stats:
-            ax1 = fig.add_subplot(121)
-            
-            sorted_expenses = sorted(expense_stats.items(), key=lambda x: x[1], reverse=True)
-            if len(sorted_expenses) > 8:
-                main_expenses = sorted_expenses[:7]
-                other_amount = sum(amount for _, amount in sorted_expenses[7:])
-                main_expenses.append(('其他', other_amount))
-            else:
-                main_expenses = sorted_expenses
-            
-            labels = [cat for cat, _ in main_expenses]
-            sizes = [amount for _, amount in main_expenses]
-            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57', '#FF9FF3', '#54A0FF', '#5F27CD']
-            
-            ax1.pie(sizes, labels=labels, colors=colors[:len(labels)], autopct='%1.1f%%', startangle=90)
-            ax1.set_title(f'{year}年支出分類', fontsize=12, fontweight='bold')
-        
-        if income_stats:
-            ax2 = fig.add_subplot(122)
-            
-            sorted_income = sorted(income_stats.items(), key=lambda x: x[1], reverse=True)
-            labels = [cat for cat, _ in sorted_income]
-            sizes = [amount for _, amount in sorted_income]
-            colors = ['#28a745', '#20c997', '#17a2b8', '#6f42c1', '#e83e8c', '#fd7e14']
-            
-            ax2.pie(sizes, labels=labels, colors=colors[:len(labels)], autopct='%1.1f%%', startangle=90)
-            ax2.set_title(f'{year}年收入分類', fontsize=12, fontweight='bold')
-        
-        fig.tight_layout()
-        
-        canvas = FigureCanvasTkAgg(fig, self.report_display_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        
-        # 統計摘要
-        total_income = sum(income_stats.values())
-        total_expense = sum(expense_stats.values())
-        
-        summary_frame = ttk.Frame(self.report_display_frame)
-        summary_frame.pack(fill=tk.X, pady=(10, 0))
-        
-        ttk.Label(summary_frame, text=f"總收入: ${total_income:,.2f}", 
-                 foreground="green").pack(side=tk.LEFT, padx=20)
-        ttk.Label(summary_frame, text=f"總支出: ${total_expense:,.2f}", 
-                 foreground="red").pack(side=tk.LEFT, padx=20)
-        ttk.Label(summary_frame, text=f"結餘: ${total_income - total_expense:,.2f}").pack(side=tk.LEFT, padx=20)
-    
     def show_month_category_chart(self):
         """顯示月度分類圓餅圖"""
         year = int(self.year_var.get())
@@ -1246,9 +1165,67 @@ def main():
         """顯示日度收支長條圖"""
         year = int(self.year_var.get())
         month = int(self.month_var.get())
-        
+
         start_date = f"{year}-{month:02d}-01"
         last_day = calendar.monthrange(year, month)[1]
         end_date = f"{year}-{month:02d}-{last_day}"
-        
-        transactions = self.transaction_manager.get_transactions_
+
+        transactions = self.transaction_manager.get_transactions_by_date_range(start_date, end_date)
+
+        if not transactions:
+            ttk.Label(self.report_display_frame, text="本月無交易資料").pack(pady=20)
+            return
+
+        # 統計每日資料
+        daily_stats = defaultdict(lambda: {'income': 0, 'expense': 0})
+
+        for trans in transactions:
+            date = trans['date']
+            daily_stats[date][trans['type']] += trans['amount']
+
+        # 準備資料
+        dates = sorted(daily_stats.keys())
+        days = [int(date.split('-')[2]) for date in dates]
+        income_data = [daily_stats[date]['income'] for date in dates]
+        expense_data = [daily_stats[date]['expense'] for date in dates]
+
+        # 建立圖表
+        fig = Figure(figsize=(12, 6), dpi=80)
+        ax = fig.add_subplot(111)
+
+        x = range(len(days))
+        width = 0.35
+
+        bars1 = ax.bar([i - width/2 for i in x], income_data, width, label='收入', color='#28a745', alpha=0.8)
+        bars2 = ax.bar([i + width/2 for i in x], expense_data, width, label='支出', color='#dc3545', alpha=0.8)
+
+        ax.set_title(f'{year}年{month}月每日收支', fontsize=14, fontweight='bold')
+        ax.set_xlabel('日期', fontsize=12)
+        ax.set_ylabel('金額 (元)', fontsize=12)
+        ax.set_xticks(x)
+        ax.set_xticklabels([f"{day}日" for day in days], rotation=45)
+        ax.legend()
+        ax.grid(True, alpha=0.3, axis='y')
+
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, self.report_display_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+def main():
+    """主程式入口"""
+    try:
+        print("正在啟動個人記帳本...")
+        app = MainWindow()
+        app.run()
+    except KeyboardInterrupt:
+        print("\n程式被使用者中斷")
+    except Exception as e:
+        print(f"程式執行錯誤：{e}")
+        import traceback
+        traceback.print_exc()
+        input("按 Enter 鍵退出...")
+
+if __name__ == "__main__":
+    main()

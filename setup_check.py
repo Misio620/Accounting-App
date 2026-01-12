@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 開發環境檢查腳本
 檢查專案檔案完整性和開發環境準備狀況
@@ -8,13 +9,23 @@ import os
 import sys
 import importlib
 
+# 設定 Windows 控制台編碼
+if sys.platform == 'win32':
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    except:
+        pass
+
 def check_project_files():
     """檢查專案檔案完整性"""
     print("📁 檢查專案檔案...")
     
     required_files = {
         'main.py': '主程式入口',
-        'database_models.py': '資料庫模型',
+        'database/__init__.py': '資料庫套件',
+        'database/models.py': '資料庫模型',
         'test_basic.py': '基本測試',
         'requirements.txt': '套件需求',
         'README.md': '專案說明'
@@ -117,7 +128,7 @@ def test_basic_functionality():
     
     try:
         # 嘗試導入資料庫模組
-        from database_models import DatabaseManager, CategoryManager, TransactionManager
+        from database.models import DatabaseManager, CategoryManager, TransactionManager
         print("✅ 資料庫模組導入成功")
         
         # 測試資料庫初始化
@@ -239,7 +250,7 @@ def main():
     db_status = check_database()
     
     # 4. 測試基本功能
-    if not missing_basic and 'database_models.py' not in missing_files:
+    if not missing_basic and 'database/models.py' not in missing_files:
         functionality_ok = test_basic_functionality()
     else:
         functionality_ok = False

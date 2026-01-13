@@ -129,7 +129,8 @@ class ChartManager:
     
     @staticmethod
     def create_bar_chart(income_data: List[float], expense_data: List[float], 
-                        labels: List[str], title: str, y_interval: Optional[int] = None) -> Figure:
+                        labels: List[str], title: str, y_interval: Optional[int] = None,
+                        bar_width: float = 0.6) -> Figure:
         """
         建立長條圖（收支對比）
         
@@ -139,6 +140,7 @@ class ChartManager:
             labels: 標籤列表
             title: 圖表標題
             y_interval: Y 軸刻度間隔（可選）
+            bar_width: 直條寬度（預設 0.6）
         
         Returns:
             Figure: matplotlib 圖表物件
@@ -155,7 +157,7 @@ class ChartManager:
         
         # 設定 x 軸位置（使用整數位置，確保對齊）
         x_positions = list(range(len(labels)))
-        bar_width = 0.6  # 單一直條寬度
+        # bar_width 從參數傳入
         
         # 只繪製支出直條（單一直條，像參考圖片）
         bars = ax.bar(
@@ -186,7 +188,7 @@ class ChartManager:
         ax.set_xticks(x_positions)  # 使用 x_positions 設定刻度
         ax.set_xticklabels(labels, fontsize=12)
         ax.tick_params(axis='y', labelsize=12)  # 設定 Y 軸刻度字體大小
-        ax.legend(fontsize=12, framealpha=0.9)
+        # ax.legend(fontsize=12, framealpha=0.9)  # 移除圖例
         ax.grid(True, alpha=0.2, axis='y', linestyle='--')
         
         # 設定 Y 軸刻度間隔
@@ -217,7 +219,9 @@ class ChartManager:
         transactions = self.transaction_manager.get_transactions_by_date_range(start_date, end_date)
         
         if not transactions:
-            ttk.Label(parent_frame, text="本年無交易資料").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
         # 統計分類資料
@@ -228,7 +232,9 @@ class ChartManager:
                 expense_stats[trans['category_name']] += trans['amount']
         
         if not expense_stats:
-            ttk.Label(parent_frame, text="本年無支出資料").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
         # 建立圓餅圖
@@ -248,7 +254,9 @@ class ChartManager:
         transactions = self.transaction_manager.get_transactions_by_date_range(start_date, end_date)
         
         if not transactions:
-            ttk.Label(parent_frame, text="無資料可顯示").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
         # 統計資料
@@ -259,7 +267,9 @@ class ChartManager:
                 expense_stats[trans['category_name']] += trans['amount']
         
         if not expense_stats:
-            ttk.Label(parent_frame, text="本月無支出資料").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
         # 建立圓餅圖
@@ -271,35 +281,97 @@ class ChartManager:
             canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
     
     def show_month_income_expense_chart(self, parent_frame, year: int) -> None:
-        """顯示月度收支長條圖"""
+        """顯示月度收支長條圖 + 月度列表"""
         # 收集12個月的資料
         months_labels = []
         income_data = []
         expense_data = []
+        monthly_details = []  # 儲存月度明細
         
         for month in range(1, 13):
             summary = self.transaction_manager.get_monthly_summary(year, month)
+            balance = summary['total_income'] - summary['total_expense']
             
             if summary['total_income'] > 0 or summary['total_expense'] > 0:
                 months_labels.append(f"{month}月")
                 income_data.append(summary['total_income'])
                 expense_data.append(summary['total_expense'])
+                monthly_details.append({
+                    'month': month,
+                    'label': f"{year}年{month:02d}月",
+                    'balance': balance
+                })
         
         if not months_labels:
-            ttk.Label(parent_frame, text="無資料可顯示").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
-        # 建立長條圖，Y 軸刻度間隔為 5000
+        # 計算年度總計
+        year_total = sum(i - e for i, e in zip(income_data, expense_data))
+        
+        # 上方：年度總計標籤
+        header_frame = tk.Frame(parent_frame, bg='#F8FAFC')
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        year_total_text = f"年總計：${year_total:,.0f}" if year_total >= 0 else f"年總計：-${abs(year_total):,.0f}"
+        year_total_color = '#10b981' if year_total >= 0 else '#ef4444'
+        
+        tk.Label(header_frame, text=year_total_text, font=('Microsoft YaHei', 16, 'bold'),
+                 fg=year_total_color, bg='#F8FAFC').pack(side=tk.RIGHT, padx=20)
+        
+        # 中間：長條圖
         fig = self.create_bar_chart(income_data, expense_data, months_labels, 
-                                    f'{year}年月度收支對比', y_interval=5000)
+                                    f'{year}年月度收支', y_interval=5000)
         
         if fig:
             canvas = FigureCanvasTkAgg(fig, parent_frame)
             canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            canvas.get_tk_widget().pack(fill=tk.X, expand=False, pady=(0, 10))
+        
+        # 下方：月度明細列表 (可捲動)
+        list_frame = tk.Frame(parent_frame, bg='#FFFFFF')
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 建立 Canvas + Scrollbar
+        canvas_scroll = tk.Canvas(list_frame, bg='#FFFFFF', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas_scroll.yview)
+        scrollable_frame = tk.Frame(canvas_scroll, bg='#FFFFFF')
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all"))
+        )
+        
+        canvas_scroll.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_scroll.configure(yscrollcommand=scrollbar.set)
+        
+        canvas_scroll.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # 填充月度明細 (倒序顯示，最近的月份在上方)
+        for detail in reversed(monthly_details):
+            row = tk.Frame(scrollable_frame, bg='#FFFFFF')
+            row.pack(fill=tk.X, padx=15, pady=8)
+            
+            # 左側色塊
+            color_block = tk.Frame(row, bg='#3b82f6', width=4, height=30)
+            color_block.pack(side=tk.LEFT, padx=(0, 10))
+            
+            # 月份標籤
+            tk.Label(row, text=detail['label'], font=('Microsoft YaHei', 14),
+                    bg='#FFFFFF', fg='#334155').pack(side=tk.LEFT)
+            
+            # 金額
+            balance = detail['balance']
+            amount_text = f"${balance:,.0f}" if balance >= 0 else f"-${abs(balance):,.0f}"
+            amount_color = '#10b981' if balance >= 0 else '#ef4444'
+            tk.Label(row, text=amount_text, font=('Microsoft YaHei', 14, 'bold'),
+                    bg='#FFFFFF', fg=amount_color).pack(side=tk.RIGHT)
     
     def show_daily_income_expense_chart(self, parent_frame, year: int, month: int) -> None:
-        """顯示日度收支長條圖"""
+        """顯示日度收支長條圖 + 日度列表"""
         start_date = f"{year}-{month:02d}-01"
         last_day = calendar.monthrange(year, month)[1]
         end_date = f"{year}-{month:02d}-{last_day}"
@@ -307,7 +379,9 @@ class ChartManager:
         transactions = self.transaction_manager.get_transactions_by_date_range(start_date, end_date)
         
         if not transactions:
-            ttk.Label(parent_frame, text="本月無交易資料").pack(pady=20)
+            no_data_label = tk.Label(parent_frame, text="無交易資料", 
+                                     font=('Microsoft YaHei', 40), fg='#94a3b8', bg='#FFFFFF')
+            no_data_label.pack(expand=True)
             return
         
         # 統計每日資料
@@ -324,16 +398,75 @@ class ChartManager:
         expense_data = [daily_stats[date]['expense'] for date in dates]
         day_labels = [f"{day}日" for day in days]
         
-        # 建立長條圖，Y 軸刻度間隔為 100
+        # 計算月度明細
+        daily_details = []
+        for date in dates:
+            day = int(date.split('-')[2])
+            balance = daily_stats[date]['income'] - daily_stats[date]['expense']
+            daily_details.append({
+                'day': day,
+                'label': f"{month}月{day:02d}日",
+                'balance': balance
+            })
+        
+        # 計算月度總計
+        month_total = sum(i - e for i, e in zip(income_data, expense_data))
+        
+        # 上方：月度總計標籤
+        header_frame = tk.Frame(parent_frame, bg='#F8FAFC')
+        header_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        month_total_text = f"月總計：${month_total:,.0f}" if month_total >= 0 else f"月總計：-${abs(month_total):,.0f}"
+        month_total_color = '#10b981' if month_total >= 0 else '#ef4444'
+        
+        tk.Label(header_frame, text=month_total_text, font=('Microsoft YaHei', 16, 'bold'),
+                 fg=month_total_color, bg='#F8FAFC').pack(side=tk.RIGHT, padx=20)
+        
+        # 中間：長條圖 (高度固定)
         fig = self.create_bar_chart(income_data, expense_data, day_labels, 
-                                    f'{year}年{month}月每日收支', y_interval=100)
+                                    f'{year}年{month}月每日收支', y_interval=500, bar_width=0.4)
         
         if fig:
-            # 調整 x 軸標籤角度
             ax = fig.axes[0]
             ax.set_xticklabels(day_labels, rotation=45)
             fig.tight_layout()
             
             canvas = FigureCanvasTkAgg(fig, parent_frame)
             canvas.draw()
-            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            canvas.get_tk_widget().pack(fill=tk.X, expand=False, pady=(0, 10))
+        
+        # 下方：日度明細列表 (可捲動)
+        list_frame = tk.Frame(parent_frame, bg='#FFFFFF')
+        list_frame.pack(fill=tk.BOTH, expand=True)
+        
+        canvas_scroll = tk.Canvas(list_frame, bg='#FFFFFF', highlightthickness=0)
+        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas_scroll.yview)
+        scrollable_frame = tk.Frame(canvas_scroll, bg='#FFFFFF')
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas_scroll.configure(scrollregion=canvas_scroll.bbox("all"))
+        )
+        
+        canvas_scroll.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas_scroll.configure(yscrollcommand=scrollbar.set)
+        
+        canvas_scroll.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # 填充日度明細 (倒序顯示)
+        for detail in reversed(daily_details):
+            row = tk.Frame(scrollable_frame, bg='#FFFFFF')
+            row.pack(fill=tk.X, padx=15, pady=6)
+            
+            color_block = tk.Frame(row, bg='#3b82f6', width=4, height=24)
+            color_block.pack(side=tk.LEFT, padx=(0, 10))
+            
+            tk.Label(row, text=detail['label'], font=('Microsoft YaHei', 13),
+                    bg='#FFFFFF', fg='#334155').pack(side=tk.LEFT)
+            
+            balance = detail['balance']
+            amount_text = f"${balance:,.0f}" if balance >= 0 else f"-${abs(balance):,.0f}"
+            amount_color = '#10b981' if balance >= 0 else '#ef4444'
+            tk.Label(row, text=amount_text, font=('Microsoft YaHei', 13, 'bold'),
+                    bg='#FFFFFF', fg=amount_color).pack(side=tk.RIGHT)

@@ -2,33 +2,40 @@
 UI 配置檔案 - 統一的顏色、字體、間距設定
 """
 
-# 配色方案
+# 配色方案 (Modern Minimalist - Light Theme Optimized)
 COLORS = {
-    # 主色
-    'primary': '#2563eb',
-    'primary_light': '#3b82f6',
-    'primary_dark': '#1e40af',
+    # 主色 (macOS Blue / CTk Theme Blue)
+    'primary': '#3B8ED0',       
+    'primary_light': '#60A5FA', 
+    'primary_dark': '#1F6AA5',  
     
     # 功能色
-    'success': '#10b981',      # 綠色（收入）
-    'danger': '#ef4444',       # 紅色（支出）
-    'warning': '#f59e0b',      # 橙色
-    'info': '#06b6d4',         # 青色
+    'success': '#2CC985',      # 現代感綠
+    'danger': '#EE5555',       # 柔和紅
+    'warning': '#FFAA00',      # 暖橘
+    'info': '#409CFF',         # 亮藍
     
     # 背景色
-    'bg_primary': '#ffffff',
-    'bg_secondary': '#f8fafc',
-    'bg_dark': '#1e293b',
-    'bg_card': '#ffffff',
+    'bg_primary': '#F3F4F6',   # 淺灰 (Dashboard 背景)
+    'bg_secondary': '#FFFFFF', # 輔助背景
+    'bg_dark': '#2B2B2B',
+    'bg_card': '#FFFFFF',
+    
+    # Sidebar 專用色
+    'sidebar_bg': '#1E293B',        # 深藍灰 (Slate 800)
+    'sidebar_text': '#94A3B8',      # 淺灰文字 (Slate 400)
+    'sidebar_text_active': '#FFFFFF', # 亮白文字
+    'sidebar_selected': '#334155',  # 選中背景 (Slate 700)
+    'sidebar_hover': '#334155',     # 懸停背景
     
     # 文字色
-    'text_primary': '#0f172a',
-    'text_secondary': '#64748b',
-    'text_light': '#94a3b8',
-    
+    'text_primary': '#1E293B', # 深色主文
+    'text_secondary': '#64748B', # 次要文字
+    'text_light': '#94A3B8',
+
     # 邊框色
-    'border': '#e2e8f0',
-    'border_light': '#f1f5f9',
+    'border': '#E2E8F0',
+    'border_light': '#F1F5F9',
     
     # 圖表配色（8色）
     'chart_colors': [
@@ -45,30 +52,30 @@ COLORS = {
 
 # 字體設定
 FONTS = {
-    'title': ('Microsoft YaHei UI', 22, 'bold'),
-    'heading': ('Microsoft YaHei UI', 14, 'bold'),
-    'subheading': ('Microsoft YaHei UI', 12, 'bold'),
-    'body': ('Microsoft YaHei UI', 11),
-    'caption': ('Microsoft YaHei UI', 9),
-    'number': ('Consolas', 12, 'bold'),
-    'number_large': ('Consolas', 16, 'bold'),
+    'title': ('Microsoft YaHei UI', 24, 'bold'),
+    'heading': ('Microsoft YaHei UI', 16, 'bold'),
+    'subheading': ('Microsoft YaHei UI', 14, 'bold'),
+    'body': ('Microsoft YaHei UI', 12),
+    'caption': ('Microsoft YaHei UI', 10),
+    'number': ('Consolas', 14, 'bold'),
+    'number_large': ('Consolas', 20, 'bold'),
 }
 
 # 間距系統
 SPACING = {
     'xs': 4,
     'sm': 8,
-    'md': 12,
-    'lg': 16,
-    'xl': 24,
-    'xxl': 32,
+    'md': 16,
+    'lg': 24,
+    'xl': 32,
+    'xxl': 48,
 }
 
 PADDING = {
     'tight': 8,
-    'normal': 12,
-    'loose': 16,
-    'extra': 20,
+    'normal': 16,
+    'loose': 24,
+    'extra': 32,
 }
 
 # 圖標
@@ -93,33 +100,46 @@ ICONS = {
     'info': 'ℹ️',
     'up': '↑',
     'down': '↓',
+    'dollar': '💲',
 }
 
-# 按鈕樣式配置
+# 按鈕樣式配置 (CTk 適配)
 BUTTON_STYLES = {
     'primary': {
-        'bg': COLORS['primary'],
-        'fg': '#ffffff',
-        'active_bg': COLORS['primary_dark'],
-        'padding': (10, 20),
+        'fg_color': COLORS['primary'],
+        'text_color': '#ffffff',
+        'hover_color': COLORS['primary_dark'],
     },
     'success': {
-        'bg': COLORS['success'],
-        'fg': '#ffffff',
-        'active_bg': '#059669',
-        'padding': (10, 20),
+        'fg_color': COLORS['success'],
+        'text_color': '#ffffff',
+        'hover_color': '#25AD71',
     },
     'danger': {
-        'bg': COLORS['danger'],
-        'fg': '#ffffff',
-        'active_bg': '#dc2626',
-        'padding': (10, 20),
+        'fg_color': COLORS['danger'],
+        'text_color': '#ffffff',
+        'hover_color': '#CF4444',
     },
     'secondary': {
-        'bg': COLORS['bg_secondary'],
-        'fg': COLORS['text_primary'],
-        'active_bg': COLORS['border'],
-        'padding': (10, 20),
+        'fg_color': '#FFFFFF',
+        'text_color': COLORS['text_primary'],
+        'hover_color': '#F1F5F9',
+        'border_width': 1,
+        'border_color': COLORS['border'],
+    },
+    'sidebar': {
+        'fg_color': 'transparent',
+        'text_color': '#94A3B8',
+        'hover_color': '#334155',
+        'anchor': 'w',
+    },
+    'sidebar_active': {
+        'fg_color': '#334155',
+        'text_color': '#FFFFFF',
+        'hover_color': '#334155',
+        'anchor': 'w',
+        'border_color': COLORS['primary'],
+        'border_width': 0, # Left border handled manually or via compound
     }
 }
 

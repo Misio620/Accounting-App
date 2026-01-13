@@ -5,6 +5,7 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+import customtkinter as ctk
 from datetime import datetime
 import sys
 import os
@@ -31,7 +32,7 @@ except ImportError:
 
 
 class MainWindow:
-    """主視窗類別 - 重構版本"""
+    """主視窗類別 - 重構版本 (CustomTkinter)"""
     
     def __init__(self):
         print("正在初始化個人記帳本...")
@@ -56,11 +57,17 @@ class MainWindow:
         else:
             self.backup_manager = None
         
-        # 建立主視窗
-        self.root = tk.Tk()
-        self.root.title("個人記帳本 v1.1 (重構版)")
-        self.root.geometry("1000x800")
-        self.root.minsize(800, 600)
+        # 建立主視窗 (CustomTkinter)
+        ctk.set_appearance_mode("Light")  # 極簡白風格
+        ctk.set_default_color_theme("blue")
+        
+        self.root = ctk.CTk()
+        self.root.title("個人記帳本 v2.0 (Modern UI)")
+        self.root.geometry("1100x850") # 稍微加大以適應寬鬆排版
+        self.root.minsize(900, 700)
+        
+        # 設定全域字體大致比例 (CTk 會自動縮放，但這裡保留參考)
+        # self.root.option_add("*Font", FONTS['body']) # CTk 不吃這個，但 tk 元件 (如 Treeview) 吃
         
         self.current_transactions = []
         
@@ -69,96 +76,203 @@ class MainWindow:
         print("✅ 界面初始化完成")
     
     def setup_ui(self):
-        """設定主界面"""
-        # 建立選單列
-        self.setup_menu()
+        """設定主界面 (Dashboard Layout)"""
+        # self.setup_menu() - 已移除，改用 Sidebar + Settings View
         
-        # 主框架
-        main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        # 主佈局配置
+        self.root.grid_columnconfigure(0, weight=0) # Sidebar 固定
+        self.root.grid_columnconfigure(1, weight=1) # Content 自適應
+        self.root.grid_rowconfigure(0, weight=1)
         
-        # 標題和版本資訊
-        header_frame = tk.Frame(main_frame, bg=COLORS['bg_secondary'], height=60)
-        header_frame.grid(row=0, column=0, columnspan=3, pady=(0, SPACING['lg']), sticky=(tk.W, tk.E))
-        header_frame.pack_propagate(False)
+        # 視圖管理初始化
+        self.views = {}
+        self.nav_buttons = {}
         
-        # 內部容器
-        header_content = tk.Frame(header_frame, bg=COLORS['bg_secondary'])
-        header_content.pack(fill=tk.BOTH, expand=True, padx=PADDING['loose'], pady=SPACING['md'])
+        # 1. 建立側邊欄 Sidebar
+        self.setup_sidebar()
         
-        title_label = tk.Label(
-            header_content,
-            text=f"{ICONS['balance']} 個人記帳本",
-            font=FONTS['title'],
-            fg=COLORS['primary'],
-            bg=COLORS['bg_secondary']
-        )
-        title_label.pack(side=tk.LEFT)
-        
-        version_label = tk.Label(
-            header_content,
-            text="v1.1",
-            font=FONTS['caption'],
-            fg=COLORS['text_light'],
-            bg=COLORS['bg_secondary']
-        )
-        version_label.pack(side=tk.RIGHT, padx=(0, SPACING['md']))
-        
-        # 按鈕區域
-        self.setup_buttons(main_frame)
-        
-        # 篩選區域 - 使用 FilterPanel 模組
-        filter_container = ttk.Frame(main_frame)
-        filter_container.grid(row=2, column=0, columnspan=3, sticky=(tk.W, tk.E))
-        self.filter_panel = FilterPanel(filter_container, self.category_manager, self.on_filter_applied)
-        
-        # 交易記錄列表
-        self.setup_transaction_list(main_frame)
-        
-        # 統計區域
-        self.setup_statistics(main_frame)
-        
-        # 報表區域 - 已移除，改為獨立視窗
-        # self.setup_reports(main_frame)
-        
-        # 設定網格權重
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
-        main_frame.rowconfigure(3, weight=1)  # 交易列表可擴展
+        # 2. 建立內容區域 Content Area
+        self.content_area = ctk.CTkFrame(self.root, fg_color="transparent", corner_radius=0)
+        self.content_area.grid(row=0, column=1, sticky="nsew", padx=SPACING['lg'], pady=SPACING['lg'])
+        self.content_area.grid_rowconfigure(0, weight=1)
+        self.content_area.grid_columnconfigure(0, weight=1)
         
         # 綁定快捷鍵
         self.setup_shortcuts()
         
-        # UI 建立完成後載入資料
-        self.root.after(100, self.refresh_data)
+        # 初始顯示 Dashboard
+        self.root.after(100, lambda: self.switch_view('dashboard'))
+
+    # setup_menu 已移除
+
+    def setup_sidebar(self):
+        """建立左側導航欄"""
+        self.sidebar = ctk.CTkFrame(self.root, fg_color=COLORS['sidebar_bg'], width=240, corner_radius=0)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_rowconfigure(4, weight=1) # Spacer push bottom
+        
+        # Logo / App Name
+        logo_label = ctk.CTkLabel(
+            self.sidebar,
+            text=f" {ICONS['balance']} 個人記帳本",
+            font=(FONTS['heading'][0], 20, "bold"),
+            text_color="#FFFFFF"
+        )
+        logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        
+        version_label = ctk.CTkLabel(
+            self.sidebar,
+            text="v2.0 Dashboard",
+            font=(FONTS['caption'][0], 12),
+            text_color=COLORS['text_secondary']
+        )
+        version_label.grid(row=1, column=0, padx=20, pady=(0, 20))
+        
+        # CTA Button (記一筆)
+        cta_btn = ModernButton(
+            self.sidebar,
+            text="記一筆",
+            icon='add',
+            style='primary',
+            height=40,
+            command=self.add_transaction
+        )
+        cta_btn.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        
+        # Navigation
+        self.nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_frame.grid(row=3, column=0, sticky="ew", pady=10)
+        
+        # 主導航
+        self.create_nav_button("dashboard", f"{ICONS['chart']} 首頁", self.nav_frame)
+        
+        # 分隔線 (字體與 nav button 統一)
+        ctk.CTkLabel(self.nav_frame, text="── 報表分析 ──", text_color=COLORS['text_secondary'], 
+                     font=(FONTS['body'][0], 13, "bold")).pack(fill="x", padx=15, pady=(15, 5))
+        
+        # 報表快捷按鈕
+        self.create_report_button("year_category", "📊 年分類", self.nav_frame)
+        self.create_report_button("month_category", "📊 月分類", self.nav_frame)
+        self.create_report_button("month_income_expense", "📈 月收支", self.nav_frame)
+        self.create_report_button("daily_income_expense", "📈 日收支", self.nav_frame)
+        
+        # 分隔線
+        ctk.CTkLabel(self.nav_frame, text="", text_color=COLORS['text_secondary']).pack(fill="x", pady=5)
+        
+        # 資料管理
+        self.create_nav_button("settings", f"{ICONS['settings']} 資料管理", self.nav_frame)
+        
+        # Bottom Area
+        self.sidebar_bottom = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.sidebar_bottom.grid(row=5, column=0, sticky="ew", pady=20)
+        
+        self.status_label = ctk.CTkLabel(
+            self.sidebar_bottom, 
+            text="準備就緒", 
+            text_color=COLORS['text_secondary'],
+            font=(FONTS['caption'][0], 10)
+        )
+        self.status_label.pack(side="bottom", pady=5)
+        
+    def create_nav_button(self, view_name, text, parent):
+        """建立導航按鈕"""
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            height=40,
+            corner_radius=5,
+            border_spacing=10,
+            text_color=COLORS['sidebar_text'],
+            fg_color="transparent",
+            hover_color=COLORS['sidebar_hover'],
+            anchor="w",
+            font=(FONTS['body'][0], 13, "bold"),
+            command=lambda: self.switch_view(view_name)
+        )
+        btn.pack(fill="x", padx=10, pady=2)
+        self.nav_buttons[view_name] = btn
     
-    def setup_menu(self):
-        """設定選單列"""
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
+    def create_report_button(self, report_type, text, parent):
+        """建立報表快捷按鈕"""
+        view_name = f"report_{report_type}"
+        btn = ctk.CTkButton(
+            parent,
+            text=text,
+            height=40,
+            corner_radius=5,
+            border_spacing=10,
+            text_color=COLORS['sidebar_text'],
+            fg_color="transparent",
+            hover_color=COLORS['sidebar_hover'],
+            anchor="w",
+            font=(FONTS['body'][0], 13, "bold"),
+            command=lambda: self.switch_view(view_name)
+        )
+        btn.pack(fill="x", padx=10, pady=2)
+        self.nav_buttons[view_name] = btn
         
-        # 檔案選單
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="檔案", menu=file_menu)
-        file_menu.add_command(label="匯出 CSV", command=self.export_to_csv, accelerator="Ctrl+S")
-        file_menu.add_command(label="匯出 Excel", command=self.export_to_excel)
-        file_menu.add_separator()
-        file_menu.add_command(label="退出", command=self.on_closing, accelerator="Alt+F4")
+    def switch_view(self, view_name):
+        """切換視圖"""
+        # 更新按鈕狀態
+        for name, btn in self.nav_buttons.items():
+            if name == view_name:
+                btn.configure(
+                    fg_color=COLORS['sidebar_selected'],
+                    text_color=COLORS['sidebar_text_active']
+                )
+            else:
+                btn.configure(
+                    fg_color="transparent",
+                    text_color=COLORS['sidebar_text']
+                )
         
-        # 管理選單
-        manage_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="管理", menu=manage_menu)
-        manage_menu.add_command(label="分類管理", command=self.open_category_management, accelerator="Ctrl+M")
-        manage_menu.add_separator()
-        manage_menu.add_command(label="備份資料", command=self.backup_database)
-        manage_menu.add_command(label="還原資料", command=self.restore_database)
+        # 隱藏當前視圖
+        if hasattr(self, 'current_view_frame') and self.current_view_frame:
+            self.current_view_frame.pack_forget()
+            
+        # 顯示/建立目標視圖
+        if view_name not in self.views:
+            # Lazy loading
+            self.create_view(view_name)
+            
+        self.current_view_frame = self.views[view_name]
+        self.current_view_frame.pack(fill="both", expand=True)
         
-        # 說明選單
-        help_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="說明", menu=help_menu)
-        help_menu.add_command(label="快捷鍵說明", command=self.show_shortcuts_help)
-        help_menu.add_command(label="關於", command=self.show_about)
+        # 觸發特定視圖的刷新邏輯
+        if view_name == 'dashboard':
+            self.refresh_dashboard()
+        elif view_name == 'transactions':
+            self.refresh_transactions()
+        elif view_name.startswith('report_'):
+            # 報表視圖：更新當前報表類型並刷新
+            report_type = view_name.replace('report_', '')
+            self.current_report_type = report_type
+            self.current_report_parent = self.views[view_name]
+            # 延遲刷新以確保視圖已顯示
+            self.root.after(50, self._refresh_current_chart)
+            
+    def create_view(self, view_name):
+        """工廠方法：建立各個視圖"""
+        # 每個 View 都是一個 CTkFrame，背景預設為 bg_primary (content color)
+        view = ctk.CTkFrame(self.content_area, fg_color="transparent")
+        self.views[view_name] = view
+        
+        if view_name == 'dashboard':
+            self._setup_view_dashboard(view)
+        elif view_name == 'transactions':
+            self._setup_view_transactions(view)
+        elif view_name == 'reports':
+            self._setup_view_reports(view)
+        elif view_name == 'settings':
+            self._setup_view_settings(view)
+        elif view_name.startswith('report_'):
+            # 內嵌報表視圖
+            report_type = view_name.replace('report_', '')
+            self._setup_view_report_embed(view, report_type)
+
+    
+    # setup_menu - 已移除
+
     
     def setup_shortcuts(self):
         """設定快捷鍵"""
@@ -166,213 +280,351 @@ class MainWindow:
         self.root.bind('<F5>', lambda e: self.refresh_data())
         self.root.bind('<Control-s>', lambda e: self.export_to_csv())
     
-    def setup_buttons(self, parent):
-        """設定按鈕區域"""
-        button_frame = tk.Frame(parent, bg=COLORS['bg_primary'])
-        button_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=SPACING['md'])
-        
-        # 左側按鈕
-        left_buttons = tk.Frame(button_frame, bg=COLORS['bg_primary'])
-        left_buttons.pack(side=tk.LEFT)
-        
-        ModernButton(
-            left_buttons,
-            text="新增交易",
-            style='primary',
-            icon='add',
-            command=self.add_transaction
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
-        
-        # 分隔線
-        sep = tk.Frame(left_buttons, width=2, bg=COLORS['border'])
-        sep.pack(side=tk.LEFT, padx=SPACING['md'], fill=tk.Y)
-        
-        ModernButton(
-            left_buttons,
-            text="重新整理",
-            style='secondary',
-            icon='refresh',
-            command=self.refresh_data
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
-        
-        ModernButton(
-            left_buttons,
-            text="統計報表",
-            style='secondary',
-            icon='chart',
-            command=self.open_report_window
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
-        
-        # 右側匯出按鈕
-        export_frame = tk.Frame(button_frame, bg=COLORS['bg_primary'])
-        export_frame.pack(side=tk.RIGHT)
-        
-        ModernButton(
-            export_frame,
-            text="匯出 CSV",
-            style='secondary',
-            icon='export',
-            command=self.export_to_csv
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
-        
-        ModernButton(
-            export_frame,
-            text="匯出 Excel",
-            style='success',
-            icon='export',
-            command=self.export_to_excel
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
+    # --- View Setup Methods ---
     
-    def setup_transaction_list(self, parent):
-        """設定交易記錄列表"""
-        list_frame = ttk.LabelFrame(parent, text="交易記錄", padding="5")
-        list_frame.grid(row=3, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
+    def _setup_view_dashboard(self, parent):
+        """Dashboard View: 統計卡片與交易列表"""
+        # Header
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 15))
         
-        columns = ('日期', '類型', '分類', '金額', '備註')
-        self.transaction_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=12)
+        ctk.CTkLabel(header, text="首頁", font=(FONTS['title'][0], 24, "bold")).pack(side="left")
+        ctk.CTkLabel(header, text=f"{datetime.now().strftime('%Y年%m月%d日')}", 
+                   font=(FONTS['body'][0], 14), text_color=COLORS['text_secondary']).pack(side="right", anchor="s")
         
-        # 設定欄位標題和寬度
-        self.transaction_tree.heading('日期', text='日期')
-        self.transaction_tree.heading('類型', text='類型')
-        self.transaction_tree.heading('分類', text='分類')
-        self.transaction_tree.heading('金額', text='金額')
-        self.transaction_tree.heading('備註', text='備註')
+        # 1. 統計卡片區域
+        stats_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        stats_frame.pack(fill="x", pady=(0, 15))
+        stats_frame.grid_columnconfigure(0, weight=1)
+        stats_frame.grid_columnconfigure(1, weight=1)
+        stats_frame.grid_columnconfigure(2, weight=1)
         
-        self.transaction_tree.column('日期', width=100, anchor='center')
-        self.transaction_tree.column('類型', width=80, anchor='center')
-        self.transaction_tree.column('分類', width=120, anchor='center')
-        self.transaction_tree.column('金額', width=120, anchor='center')  # 改為置中
-        self.transaction_tree.column('備註', width=280, anchor='center')
+        self.income_card = StatCard(stats_frame, card_type='income')
+        self.income_card.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         
-        # 滾動條
-        v_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.transaction_tree.yview)
-        h_scrollbar = ttk.Scrollbar(list_frame, orient=tk.HORIZONTAL, command=self.transaction_tree.xview)
-        self.transaction_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        self.expense_card = StatCard(stats_frame, card_type='expense')
+        self.expense_card.grid(row=0, column=1, sticky="ew", padx=10)
         
-        # 放置組件
-        self.transaction_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        v_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        h_scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        self.balance_card = StatCard(stats_frame, card_type='balance')
+        self.balance_card.grid(row=0, column=2, sticky="ew", padx=(10, 0))
         
-        # 設定網格權重
-        list_frame.columnconfigure(0, weight=1)
-        list_frame.rowconfigure(0, weight=1)
+        # 2. 快速篩選按鈕列
+        filter_bar = ctk.CTkFrame(parent, fg_color="transparent")
+        filter_bar.pack(fill="x", pady=(0, 10))
         
-        # 綁定選擇事件
-        self.transaction_tree.bind('<<TreeviewSelect>>', self.on_transaction_select)
+        ctk.CTkLabel(filter_bar, text="期間篩選：", font=(FONTS['body'][0], 13)).pack(side="left", padx=(0, 10))
+        
+        self.period_buttons = {}
+        periods = [("today", "本日"), ("week", "本週"), ("month", "本月"), ("year", "本年"), ("all", "所有紀錄")]
+        for key, label in periods:
+            btn = ctk.CTkButton(
+                filter_bar, text=label, width=70, height=32,
+                fg_color=COLORS['primary'] if key == "month" else "transparent",
+                text_color="white" if key == "month" else COLORS['text_primary'],
+                border_width=1, border_color=COLORS['border'],
+                corner_radius=5,
+                command=lambda k=key: self.filter_by_period(k)
+            )
+            btn.pack(side="left", padx=3)
+            self.period_buttons[key] = btn
+        
+        self.current_period = "month"  # 預設本月
+        
+        # 3. 交易列表區域
+        list_container = ctk.CTkFrame(parent, fg_color=COLORS['bg_card'], corner_radius=10)
+        list_container.pack(fill="both", expand=True)
+        
+        # Treeview
+        self._create_transaction_tree(list_container)
+
+    def _setup_view_transactions(self, parent):
+        """Transactions View: 完整交易列表"""
+        # Header
+        ctk.CTkLabel(parent, text="交易明細", font=(FONTS['title'][0], 24, "bold")).pack(anchor="w", pady=(0, 20))
+        
+        # 1. 篩選與工具列 (使用 Grid 因為 FilterPanel 設計為 Grid 佈局)
+        # 我們創建一個容器來容納 FilterPanel，並加上操作按鈕
+        tools_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        tools_frame.pack(fill="x", pady=(0, 10))
+        tools_frame.grid_columnconfigure(0, weight=1)
+        
+        # 篩選器
+        filter_container = ctk.CTkFrame(tools_frame, fg_color=COLORS['bg_primary'])
+        filter_container.grid(row=0, column=0, sticky="ew")
+        
+        # 按鈕區 (放在篩選器上方或旁? Dashboard 風格通常篩選器常駐)
+        # 我們將 FilterPanel 整合進來
+        # 注意：FilterPanel 原本期望 control_parent 參數
+        
+        # 右側功能按鈕 (新增、編輯、匯出...)
+        # 這裡我們簡化，只放 Filter。新增按鈕已在 Sidebar。
+        
+        self.filter_panel = FilterPanel(filter_container, self.category_manager, self.on_filter_applied)
+        
+        # 2. 交易列表 (Treeview)
+        list_container = ctk.CTkFrame(parent, fg_color=COLORS['bg_card'], corner_radius=10)
+        list_container.pack(fill="both", expand=True)
+        
+        # Treeview Style & Setup (Reuse Logic)
+        self._create_transaction_tree(list_container)
+        
+    def _create_transaction_tree(self, parent):
+        """建立 Treeview (獨立方法以供複用)"""
+        columns = ('date', 'type', 'category', 'amount', 'description')
+        
+        # Treeview Container
+        tree_frame = ctk.CTkFrame(parent, fg_color=COLORS['bg_card'])
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Scrollbars
+        v_scrollbar = ctk.CTkScrollbar(tree_frame, orientation="vertical")
+        h_scrollbar = ctk.CTkScrollbar(tree_frame, orientation="horizontal")
+        
+        # Style
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview", 
+                        background="#FFFFFF", 
+                        fieldbackground="#FFFFFF", 
+                        foreground=COLORS['text_primary'],
+                        rowheight=48, # 加高以配合字體
+                        borderwidth=0,
+                        font=(FONTS['body'][0], 16))
+        style.configure("Treeview.Heading", 
+                        background="#F8FAFC", 
+                        foreground=COLORS['text_secondary'], 
+                        relief="flat",
+                        font=(FONTS['body'][0], 16, "bold"))
+        style.map("Treeview", background=[('selected', COLORS['primary'])], foreground=[('selected', 'white')])
+
+        self.transaction_tree = ttk.Treeview(tree_frame, columns=columns, show='headings', 
+                                           yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+        
+        v_scrollbar.configure(command=self.transaction_tree.yview)
+        h_scrollbar.configure(command=self.transaction_tree.xview)
+        
+        # Define Columns
+        self.transaction_tree.heading('date', text='日期')
+        self.transaction_tree.column('date', width=100, anchor='center')
+        
+        self.transaction_tree.heading('type', text='類型')
+        self.transaction_tree.column('type', width=60, anchor='center')
+        
+        self.transaction_tree.heading('category', text='分類')
+        self.transaction_tree.column('category', width=120, anchor='center')
+        
+        self.transaction_tree.heading('amount', text='金額')
+        self.transaction_tree.column('amount', width=100, anchor='center')
+        
+        self.transaction_tree.heading('description', text='備註')
+        self.transaction_tree.column('description', width=300, anchor='center')
+        
+        # Layout
+        self.transaction_tree.pack(side="left", fill="both", expand=True)
+        v_scrollbar.pack(side="right", fill="y")
+        h_scrollbar.pack(side="bottom", fill="x") # Wait, pack bottom of frame? No. grid is better for scrollbars.
+        
+        # Re-do layout with grid
+        self.transaction_tree.pack_forget()
+        v_scrollbar.pack_forget()
+        h_scrollbar.pack_forget()
+        
+        tree_frame.grid_columnconfigure(0, weight=1)
+        tree_frame.grid_rowconfigure(0, weight=1)
+        
+        self.transaction_tree.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        
+        # Events
         self.transaction_tree.bind('<Double-1>', lambda e: self.edit_transaction())
         
-        # 操作按鈕區域（選中交易時顯示）
-        self.action_frame = tk.Frame(list_frame, bg=COLORS['bg_card'], height=60)
-        self.action_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(SPACING['sm'], 0))
-        self.action_frame.grid_remove()  # 初始隱藏
+        # Status / Counts setup logic should be added here or in refresh.
+        # Let's add a status bar at bottom of list container
+        self.list_status_label = ctk.CTkLabel(parent, text="準備就緒", text_color=COLORS['text_light'], anchor="e")
+        self.list_status_label.pack(fill="x", padx=10, pady=(0, 5))
+
+    def _setup_view_reports(self, parent):
+        """Reports View: 進階分析入口"""
+        ctk.CTkLabel(parent, text="報表分析", font=(FONTS['title'][0], 24, "bold")).pack(anchor="w", pady=(0, 20))
         
-        action_content = tk.Frame(self.action_frame, bg=COLORS['bg_card'])
-        action_content.pack(fill=tk.BOTH, expand=True, padx=PADDING['normal'], pady=SPACING['sm'])
+        # 網格佈局容器
+        grid = ctk.CTkFrame(parent, fg_color="transparent")
+        grid.pack(fill="both", expand=True)
+        grid.grid_columnconfigure(0, weight=1)
+        grid.grid_columnconfigure(1, weight=1)
         
-        # 左側：選中的交易資訊
-        self.selected_info_label = tk.Label(
-            action_content,
-            text="",
-            font=FONTS['body'],
-            fg=COLORS['text_secondary'],
-            bg=COLORS['bg_card'],
-            anchor='w'
-        )
-        self.selected_info_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # 定義按鈕參數 (文字, report_type, row, col, color)
+        buttons = [
+            ("年度分類分析", "year_category", 0, 0, COLORS['primary']),
+            ("月度分類佔比", "month_category", 0, 1, COLORS['info']),
+            ("月度收支趨勢", "month_income_expense", 1, 0, COLORS['success']),
+            ("每日收支明細", "daily_income_expense", 1, 1, COLORS['warning'])
+        ]
         
-        # 右側：操作按鈕
-        button_container = tk.Frame(action_content, bg=COLORS['bg_card'])
-        button_container.pack(side=tk.RIGHT)
+        for text, report_type, row, col, color in buttons:
+            btn_frame = ctk.CTkFrame(grid, fg_color=COLORS['bg_card'], corner_radius=15)
+            btn_frame.grid(row=row, column=col, sticky="nsew", padx=10, pady=10)
+            
+            # 大按鈕
+            btn = ctk.CTkButton(
+                btn_frame,
+                text=text,
+                font=(FONTS['heading'][0], 18, "bold"),
+                fg_color=color,
+                corner_radius=10,
+                height=100,
+                command=lambda t=report_type: self.open_report_window(t)
+            )
+            btn.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(btn_frame, text=f"檢視 {text} 報表", text_color=COLORS['text_secondary']).pack(pady=(0, 15))
+
+    def _setup_view_settings(self, parent):
+        """Settings / Data View"""
+        ctk.CTkLabel(parent, text="資料管理", font=(FONTS['title'][0], 24, "bold")).pack(anchor="w", pady=(0, 20))
         
-        from .ui_components import ModernButton
+        # 1. 匯出區
+        export_section = SectionFrame(parent, title="資料匯出")
+        export_section.pack(fill="x", pady=(0, 20))
         
-        ModernButton(
-            button_container,
-            text="編輯",
-            style='secondary',
-            icon='edit',
-            command=self.edit_transaction
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
+        ctk.CTkLabel(export_section.content, text="將交易記錄匯出為 CSV 或 Excel 檔案。").pack(anchor="w", pady=(0, 10))
         
-        ModernButton(
-            button_container,
-            text="刪除",
-            style='danger',
-            icon='delete',
-            command=self.delete_transaction
-        ).pack(side=tk.LEFT, padx=SPACING['xs'])
+        h_box = ctk.CTkFrame(export_section.content, fg_color="transparent")
+        h_box.pack(fill="x")
+        ModernButton(h_box, text="匯出 CSV", icon='export', command=self.export_to_csv).pack(side="left", padx=(0, 10))
+        ModernButton(h_box, text="匯出 Excel", icon='export', style='secondary', command=self.export_to_excel).pack(side="left")
         
-        # 狀態列
-        status_frame = ttk.Frame(list_frame)
-        status_frame.grid(row=3, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(5, 0))
+        # 2. 備份區
+        backup_section = SectionFrame(parent, title="備份與還原")
+        backup_section.pack(fill="x", pady=(0, 20))
         
-        self.status_label = ttk.Label(status_frame, text="準備就緒")
-        self.status_label.pack(side=tk.LEFT)
+        ModernButton(backup_section.content, text="立即備份資料庫", icon='backup', style='success', command=self.backup_database).pack(anchor="w", pady=(0, 10))
+        ModernButton(backup_section.content, text="從備份檔還原...", icon='refresh', style='danger', command=self.restore_database).pack(anchor="w")
         
-        self.record_count_label = ttk.Label(status_frame, text="")
-        self.record_count_label.pack(side=tk.RIGHT)
+        # 3. 分類管理
+        cat_section = SectionFrame(parent, title="分類設定")
+        cat_section.pack(fill="x", pady=(0, 20))
+        ModernButton(cat_section.content, text="管理收支分類", icon='category', command=self.open_category_management).pack(anchor="w")
+        
+        # 4. 系統與說明
+        sys_section = SectionFrame(parent, title="系統與說明")
+        sys_section.pack(fill="x")
+        
+        h_sys = ctk.CTkFrame(sys_section.content, fg_color="transparent")
+        h_sys.pack(fill="x")
+        
+        ModernButton(h_sys, text="快捷鍵說明 (F1)", icon='info', style='secondary', command=self.show_shortcuts_help).pack(side="left", padx=(0, 10))
+        ModernButton(h_sys, text="關於本軟體", icon='info', style='secondary', command=self.show_about).pack(side="left", padx=(0, 10))
+        ModernButton(h_sys, text="重新整理 (F5)", icon='refresh', style='secondary', command=self.refresh_data).pack(side="left")
+
+    def _setup_view_report_embed(self, parent, report_type):
+        """內嵌報表視圖：直接在頁面顯示圖表"""
+        # 儲存當前報表類型與 parent 以供切換使用
+        self.current_report_type = report_type
+        self.current_report_parent = parent
+        
+        # 報表名稱對應 (簡化標題)
+        titles = {
+            "year_category": "年分類",
+            "month_category": "月分類",
+            "month_income_expense": "月收支",
+            "daily_income_expense": "日收支"
+        }
+        title = titles.get(report_type, "報表分析")
+        
+        # Header
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(header, text=title, font=(FONTS['title'][0], 24, "bold")).pack(side="left")
+        
+        # 時間選擇區
+        control_frame = ctk.CTkFrame(parent, fg_color=COLORS['bg_card'], corner_radius=10)
+        control_frame.pack(fill="x", pady=(0, 15))
+        
+        control_content = ctk.CTkFrame(control_frame, fg_color="transparent")
+        control_content.pack(fill="x", padx=15, pady=10)
+        
+        now = datetime.now()
+        
+        # 年份選擇 (儲存到 parent)
+        ctk.CTkLabel(control_content, text="年份：").pack(side="left", padx=(0, 5))
+        parent.year_var = tk.StringVar(value=str(now.year))
+        year_combo = ctk.CTkComboBox(control_content, variable=parent.year_var, width=80,
+                                     values=[str(y) for y in range(now.year - 5, now.year + 2)],
+                                     command=lambda _: self._refresh_current_chart())
+        year_combo.pack(side="left", padx=(0, 15))
+        
+        # 月份選擇 (儲存到 parent)
+        parent.month_var = tk.StringVar(value=str(now.month))
+        if report_type in ["month_category", "daily_income_expense"]:
+            ctk.CTkLabel(control_content, text="月份：").pack(side="left", padx=(0, 5))
+            month_combo = ctk.CTkComboBox(control_content, variable=parent.month_var, width=60,
+                                          values=[str(m) for m in range(1, 13)],
+                                          command=lambda _: self._refresh_current_chart())
+            month_combo.pack(side="left", padx=(0, 15))
+        
+        # 圖表顯示區域 (儲存到 parent 物件屬性)
+        chart_frame = tk.Frame(parent, bg=COLORS['bg_card'])
+        chart_frame.pack(fill="both", expand=True)
+        parent.chart_frame = chart_frame
+        
+        # 初始顯示圖表
+        self.root.after(100, self._refresh_current_chart)
     
+    def _refresh_current_chart(self):
+        """刷新當前報表圖表"""
+        if not hasattr(self, 'current_report_type') or not hasattr(self, 'current_report_parent'):
+            return
+        
+        parent = self.current_report_parent
+        if not hasattr(parent, 'chart_frame'):
+            return
+            
+        chart_frame = parent.chart_frame
+        
+        # 清除舊圖表
+        for widget in chart_frame.winfo_children():
+            widget.destroy()
+        
+        try:
+            # 從 parent 物件讀取年月變數
+            year = int(parent.year_var.get()) if hasattr(parent, 'year_var') else datetime.now().year
+            month = int(parent.month_var.get()) if hasattr(parent, 'month_var') else datetime.now().month
+            report_type = self.current_report_type
+            
+            if report_type == "year_category":
+                self.chart_manager.show_year_category_chart(chart_frame, year)
+            elif report_type == "month_category":
+                self.chart_manager.show_month_category_chart(chart_frame, year, month)
+            elif report_type == "month_income_expense":
+                self.chart_manager.show_month_income_expense_chart(chart_frame, year)
+            elif report_type == "daily_income_expense":
+                self.chart_manager.show_daily_income_expense_chart(chart_frame, year, month)
+        except Exception as e:
+            error_label = ctk.CTkLabel(chart_frame, text=f"圖表生成失敗：{e}", 
+                                       text_color=COLORS['danger'])
+            error_label.pack(expand=True)
+
     def on_transaction_select(self, event):
         """當選擇交易時顯示操作按鈕"""
         selected = self.transaction_tree.selection()
         if selected:
             # 顯示操作區域
-            self.action_frame.grid()
+            self.action_frame.pack(fill="x", padx=10, pady=(0, 10)) # 使用 pack 顯示
             
             # 取得選中的交易資訊
             item = selected[0]
             values = self.transaction_tree.item(item)['values']
             if values:
-                date = values[0]
-                trans_type = values[1]
-                category = values[2]
-                amount = values[3]
-                
+                date, trans_type, category, amount, *_ = values
                 info_text = f"已選擇：{date} | {trans_type} | {category} | {amount}"
-                self.selected_info_label.config(text=info_text)
+                self.selected_info_label.configure(text=info_text)
         else:
-            # 隱藏操作區域
-            self.action_frame.grid_remove()
+            self.action_frame.pack_forget()
 
     
-    def setup_statistics(self, parent):
-        """設定統計區域"""
-        stats_frame = tk.Frame(parent, bg=COLORS['bg_primary'])
-        stats_frame.grid(row=4, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=SPACING['lg'])
-        
-        # 標題
-        title_label = tk.Label(
-            stats_frame,
-            text=f"{ICONS['chart']} 統計資訊",
-            font=FONTS['heading'],
-            fg=COLORS['text_primary'],
-            bg=COLORS['bg_primary']
-        )
-        title_label.pack(anchor='w', pady=(0, SPACING['md']))
-        
-        # 卡片容器
-        cards_container = tk.Frame(stats_frame, bg=COLORS['bg_primary'])
-        cards_container.pack(fill=tk.X)
-        
-        # 三個統計卡片 - 改用 grid 以確保均分寬度
-        cards_container.grid_columnconfigure(0, weight=1, uniform="stats")
-        cards_container.grid_columnconfigure(1, weight=1, uniform="stats")
-        cards_container.grid_columnconfigure(2, weight=1, uniform="stats")
-        
-        self.income_card = StatCard(cards_container, card_type='income')
-        self.income_card.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING['sm']))
-        
-        self.expense_card = StatCard(cards_container, card_type='expense')
-        self.expense_card.grid(row=0, column=1, sticky="nsew", padx=SPACING['sm'])
-        
-        self.balance_card = StatCard(cards_container, card_type='balance')
-        self.balance_card.grid(row=0, column=2, sticky="nsew", padx=(SPACING['sm'], 0))
-    
-    def setup_reports(self, parent):
-        """設定報表區域（改為按鈕）"""
-        report_frame = tk.Frame(parent, bg=COLORS['bg_primary'])
-        report_frame.grid(row=5, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=SPACING['lg'])
         
         # 標題
         title_label = tk.Label(
@@ -458,7 +710,8 @@ class MainWindow:
         self.current_transactions = transactions
         
         for trans in transactions:
-            amount_display = f"${trans['amount']:.2f}"
+            # 移除小數點顯，改為千分位整數
+            amount_display = f"${int(trans['amount']):,}"
             if trans['type'] == 'income':
                 amount_display = f"+{amount_display}"
             else:
@@ -479,29 +732,92 @@ class MainWindow:
         self.transaction_tree.tag_configure('income', foreground='green')
         self.transaction_tree.tag_configure('expense', foreground='red')
         
-        self.update_filtered_statistics(transactions)
-        self.record_count_label.config(text=f"共 {len(transactions)} 筆記錄")
+        # 更新狀態
+        if hasattr(self, 'list_status_label'):
+             self.list_status_label.configure(text=f"共 {len(transactions)} 筆記錄")
         
         # 隱藏操作區域
         if hasattr(self, 'action_frame'):
-            self.action_frame.grid_remove()
+            self.action_frame.pack_forget()
     
     def refresh_data(self):
         """重新整理資料顯示"""
         try:
-            transactions = self.transaction_manager.get_transactions(limit=200)
-            self.display_transactions(transactions)
+            # 1. 刷新 Dashboard (統計數據)
+            self.refresh_dashboard()
             
-            self.update_statistics()
+            # 2. 刷新 交易列表 (若存在)
+            self.refresh_transactions()
             
+            # 3. 刷新 分類篩選器 (若存在)
             if hasattr(self, 'filter_panel'):
                 self.filter_panel.update_category_filter_options()
             
-            self.status_label.config(text="資料已更新")
+            self.status_label.configure(text="資料已更新")
             
         except Exception as e:
             messagebox.showerror("錯誤", f"資料更新失敗：{e}")
-            self.status_label.config(text="更新失敗")
+            if hasattr(self, 'status_label'):
+                self.status_label.configure(text="更新失敗")
+
+    def refresh_dashboard(self):
+        """刷新 Dashboard 數據"""
+        if hasattr(self, 'income_card'):
+            self.update_statistics()
+        # 重新載入交易列表 (根據當前選擇的期間)
+        if hasattr(self, 'current_period'):
+            self.filter_by_period(self.current_period)
+    
+    def filter_by_period(self, period):
+        """根據期間篩選交易"""
+        self.current_period = period
+        
+        # 更新按鈕樣式
+        if hasattr(self, 'period_buttons'):
+            for key, btn in self.period_buttons.items():
+                if key == period:
+                    btn.configure(fg_color=COLORS['primary'], text_color="white")
+                else:
+                    btn.configure(fg_color="transparent", text_color=COLORS['text_primary'])
+        
+        # 計算日期範圍
+        now = datetime.now()
+        if period == "today":
+            start_date = now.strftime('%Y-%m-%d')
+            end_date = start_date
+        elif period == "week":
+            from datetime import timedelta
+            week_start = now - timedelta(days=now.weekday())
+            week_end = week_start + timedelta(days=6)
+            start_date = week_start.strftime('%Y-%m-%d')
+            end_date = week_end.strftime('%Y-%m-%d')
+        elif period == "month":
+            import calendar
+            start_date = f"{now.year}-{now.month:02d}-01"
+            last_day = calendar.monthrange(now.year, now.month)[1]
+            end_date = f"{now.year}-{now.month:02d}-{last_day}"
+        elif period == "year":
+            start_date = f"{now.year}-01-01"
+            end_date = f"{now.year}-12-31"
+        else:
+            start_date = None
+            end_date = None
+        
+        # 篩選交易
+        transactions = self.transaction_manager.get_transactions(limit=500)
+        if start_date and end_date:
+            filtered = [t for t in transactions if start_date <= t['date'] <= end_date]
+        else:
+            filtered = transactions
+        
+        self.display_transactions(filtered)
+
+    def refresh_transactions(self):
+        """刷新交易列表數據"""
+        if hasattr(self, 'transaction_tree'):
+            # 默認重新載入最新 200 筆
+            transactions = self.transaction_manager.get_transactions(limit=200)
+            self.display_transactions(transactions)
     
     def update_statistics(self):
         """更新統計顯示"""
@@ -509,25 +825,19 @@ class MainWindow:
         summary = self.transaction_manager.get_monthly_summary(now.year, now.month)
         
         # 更新卡片數值
-        self.income_card.set_value(summary['total_income'])
-        self.expense_card.set_value(summary['total_expense'])
-        self.balance_card.set_value(summary['balance'])
+        if hasattr(self, 'income_card'):
+            self.income_card.set_value(summary['total_income'])
+        if hasattr(self, 'expense_card'):
+            self.expense_card.set_value(summary['total_expense'])
+        if hasattr(self, 'balance_card'):
+            self.balance_card.set_value(summary['balance'])
     
-    def update_filtered_statistics(self, transactions):
-        """更新篩選後的統計顯示"""
-        total_income = sum(trans['amount'] for trans in transactions if trans['type'] == 'income')
-        total_expense = sum(trans['amount'] for trans in transactions if trans['type'] == 'expense')
-        balance = total_income - total_expense
-        
-        # 更新卡片（顯示篩選結果）
-        self.income_card.set_value(total_income, f"{ICONS['filter']} 篩選結果")
-        self.expense_card.set_value(total_expense, f"{ICONS['filter']} 篩選結果")
-        self.balance_card.set_value(balance, f"{ICONS['filter']} 篩選結果")
+    # update_filtered_statistics 已移除 (不再需要)
     
-    def open_report_window(self):
+    def open_report_window(self, report_type="year_category"):
         """開啟報表視窗"""
         from .report_window import ReportWindow
-        ReportWindow(self.root, self.transaction_manager)
+        ReportWindow(self.root, self.transaction_manager, initial_report_type=report_type)
     
     # 交易管理方法
     def add_transaction(self):
@@ -548,10 +858,10 @@ class MainWindow:
             if success:
                 messagebox.showinfo("成功", "交易記錄新增成功！")
                 self.refresh_data()
-                self.status_label.config(text="新增記錄成功")
+                self.status_label.configure(text="新增記錄成功")
             else:
                 messagebox.showerror("錯誤", "交易記錄新增失敗！")
-                self.status_label.config(text="新增記錄失敗")
+                self.status_label.configure(text="新增記錄失敗")
     
     def edit_transaction(self):
         """編輯選中的交易記錄"""
@@ -591,10 +901,10 @@ class MainWindow:
             if success:
                 messagebox.showinfo("成功", "交易記錄更新成功！")
                 self.refresh_data()
-                self.status_label.config(text="更新記錄成功")
+                self.status_label.configure(text="更新記錄成功")
             else:
                 messagebox.showerror("錯誤", "交易記錄更新失敗！")
-                self.status_label.config(text="更新記錄失敗")
+                self.status_label.configure(text="更新記錄失敗")
     
     def delete_transaction(self):
         """刪除選中的交易記錄"""
@@ -613,10 +923,10 @@ class MainWindow:
         if success:
             messagebox.showinfo("成功", "交易記錄刪除成功！")
             self.refresh_data()
-            self.status_label.config(text="刪除記錄成功")
+            self.status_label.configure(text="刪除記錄成功")
         else:
             messagebox.showerror("錯誤", "交易記錄刪除失敗！")
-            self.status_label.config(text="刪除記錄失敗")
+            self.status_label.configure(text="刪除記錄失敗")
     
     # 分類管理
     def open_category_management(self):
@@ -634,12 +944,16 @@ class MainWindow:
             messagebox.showwarning("提醒", "沒有資料可匯出")
             return
         
-        filename = filedialog.asksaveasfilename(
-            title="匯出 CSV 檔案",
-            defaultextension=".csv",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-            initialname=f"記帳資料_{datetime.now().strftime('%Y%m%d')}.csv"
-        )
+        try:
+            filename = filedialog.asksaveasfilename(
+                title="匯出 CSV 檔案",
+                defaultextension=".csv",
+                filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                initialfile=f"記帳資料_{datetime.now().strftime('%Y%m%d')}.csv"
+            )
+        except Exception as e:
+            messagebox.showerror("選擇檔案錯誤", f"無法開啟存檔對話框：{str(e)}")
+            return
         
         if not filename:
             return
@@ -681,11 +995,11 @@ class MainWindow:
                 writer.writerow(['記錄筆數', len(self.current_transactions)])
             
             messagebox.showinfo("成功", f"資料已成功匯出到：\n{filename}")
-            self.status_label.config(text="CSV 匯出成功")
+            self.status_label.configure(text="CSV 匯出成功")
             
         except Exception as e:
             messagebox.showerror("錯誤", f"匯出失敗：{str(e)}")
-            self.status_label.config(text="CSV 匯出失敗")
+            self.status_label.configure(text="CSV 匯出失敗")
     
     def export_to_excel(self):
         """匯出資料到 Excel 檔案"""
@@ -705,12 +1019,16 @@ class MainWindow:
                 self.export_to_csv()
             return
         
-        filename = filedialog.asksaveasfilename(
-            title="匯出 Excel 檔案",
-            defaultextension=".xlsx",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
-            initialname=f"記帳資料_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        )
+        try:
+            filename = filedialog.asksaveasfilename(
+                title="匯出 Excel 檔案",
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
+                initialfile=f"記帳資料_{datetime.now().strftime('%Y%m%d')}.xlsx"
+            )
+        except Exception as e:
+            messagebox.showerror("選擇檔案錯誤", f"無法開啟存檔對話框：{str(e)}")
+            return
         
         if not filename:
             return
@@ -746,11 +1064,11 @@ class MainWindow:
             
             wb.save(filename)
             messagebox.showinfo("成功", f"Excel 檔案已成功匯出到：\n{filename}")
-            self.status_label.config(text="Excel 匯出成功")
+            self.status_label.configure(text="Excel 匯出成功")
             
         except Exception as e:
             messagebox.showerror("錯誤", f"Excel 匯出失敗：{str(e)}")
-            self.status_label.config(text="Excel 匯出失敗")
+            self.status_label.configure(text="Excel 匯出失敗")
     
     # 備份和還原
     def backup_database(self):
@@ -773,10 +1091,10 @@ class MainWindow:
                 f"備份檔案: {os.path.basename(message)}\n"
                 f"檔案大小: {size_str}\n"
                 f"位置: backup/")
-            self.status_label.config(text="資料庫備份成功")
+            self.status_label.configure(text="資料庫備份成功")
         else:
             messagebox.showerror("備份失敗", message)
-            self.status_label.config(text="備份失敗")
+            self.status_label.configure(text="備份失敗")
     
     def restore_database(self):
         """還原資料庫"""
@@ -799,7 +1117,7 @@ class MainWindow:
         restore_dialog.grab_set()
         
         ttk.Label(restore_dialog, text="選擇要還原的備份", 
-                 font=("Arial", 12, "bold")).pack(pady=10)
+                  font=("Arial", 12, "bold")).pack(pady=10)
         
         # 備份列表
         list_frame = ttk.Frame(restore_dialog)
@@ -853,7 +1171,7 @@ class MainWindow:
                 messagebox.showinfo("還原成功", 
                     f"{msg}\n\n請重新啟動程式以載入還原的資料")
                 restore_dialog.destroy()
-                self.status_label.config(text="資料庫已還原")
+                self.status_label.configure(text="資料庫已還原")
             else:
                 messagebox.showerror("還原失敗", msg)
         
@@ -908,7 +1226,7 @@ Alt+F4    退出程式
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
         # 顯示啟動訊息
-        self.status_label.config(text="個人記帳本已啟動")
+        self.status_label.configure(text="個人記帳本已啟動")
         
         print("🚀 個人記帳本已啟動 (重構版)")
         print("📚 使用說明：")

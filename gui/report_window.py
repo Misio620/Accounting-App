@@ -14,10 +14,11 @@ from .ui_config import COLORS, FONTS, SPACING, PADDING, ICONS
 class ReportWindow:
     """報表視窗類別"""
     
-    def __init__(self, parent, transaction_manager):
+    def __init__(self, parent, transaction_manager, initial_report_type="year_category"):
         self.parent = parent
         self.transaction_manager = transaction_manager
         self.chart_manager = ChartManager(transaction_manager)
+        self.initial_report_type = initial_report_type
         
         # 建立視窗
         self.window = tk.Toplevel(parent)
@@ -97,7 +98,7 @@ class ReportWindow:
             fg=COLORS['text_primary']
         ).pack(side=tk.LEFT, padx=(0, SPACING['md']))
         
-        self.report_type = tk.StringVar(value="year_category")
+        self.report_type = tk.StringVar(value=self.initial_report_type)
         
         report_types = [
             ("year_category", "📊 年度分類"),

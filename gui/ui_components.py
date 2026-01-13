@@ -1,74 +1,65 @@
 """
-美化的 UI 元件
+美化的 UI 元件 (CustomTkinter Version)
 """
 
 import tkinter as tk
 from tkinter import ttk
+import customtkinter as ctk
 from datetime import datetime
 import calendar
-from .ui_config import COLORS, FONTS, SPACING, PADDING, ICONS, STAT_CARD_CONFIG
+from .ui_config import COLORS, FONTS, SPACING, PADDING, ICONS, STAT_CARD_CONFIG, BUTTON_STYLES
 
-
-class StatCard(tk.Frame):
+class StatCard(ctk.CTkFrame):
     """統計卡片元件"""
     
     def __init__(self, parent, card_type='income', **kwargs):
-        super().__init__(parent, **kwargs)
-        
         config = STAT_CARD_CONFIG[card_type]
         
-        # 設定卡片樣式
-        self.config(
-            bg=config['bg'],
-            relief='solid',
-            borderwidth=1,
-            bd=0,
-            highlightthickness=1,
-            highlightbackground=COLORS['border']
+        # 初始化 CTkFrame (背景色、圓角)
+        super().__init__(
+            parent, 
+            fg_color=config['bg'], 
+            corner_radius=10, 
+            border_width=1,
+            border_color=COLORS['border'],
+            **kwargs
         )
         
-        # 內容框架
-        content = tk.Frame(self, bg=config['bg'])
-        content.pack(fill=tk.BOTH, expand=True, padx=PADDING['loose'], pady=PADDING['loose'])
-        
-        # 標題 (已移除圖標)
-        title_label = tk.Label(
-            content,
+        # 標題
+        title_label = ctk.CTkLabel(
+            self,
             text=config['title'],
-            font=FONTS['subheading'],
-            bg=config['bg'],
-            fg=COLORS['text_secondary']
+            font=(FONTS['subheading'][0], FONTS['subheading'][1], 'bold'), # CTk font tuple
+            text_color=COLORS['text_secondary']
         )
-        title_label.pack(anchor='center', pady=(0, SPACING['sm']))
+        title_label.pack(anchor='center', pady=(PADDING['normal'], SPACING['sm']))
         
         # 金額顯示
-        self.value_label = tk.Label(
-            content,
+        self.value_label = ctk.CTkLabel(
+            self,
             text='$0.00',
-            font=FONTS['number_large'],
-            bg=config['bg'],
-            fg=config['color']
+            font=(FONTS['number_large'][0], 24, 'bold'),
+            text_color=config['color']
         )
-        self.value_label.pack(anchor='center', pady=(SPACING['sm'], 0))
+        self.value_label.pack(anchor='center', pady=(0, 0))
         
         # 趨勢顯示（預留）
-        self.trend_label = tk.Label(
-            content,
+        self.trend_label = ctk.CTkLabel(
+            self,
             text='',
-            font=FONTS['caption'],
-            bg=config['bg'],
-            fg=COLORS['text_light']
+            font=(FONTS['caption'][0], FONTS['caption'][1]),
+            text_color=COLORS['text_light']
         )
-        self.trend_label.pack(anchor='center', pady=(SPACING['xs'], 0))
+        self.trend_label.pack(anchor='center', pady=(SPACING['xs'], PADDING['normal']))
     
     def set_value(self, value, trend=None):
         """設定卡片數值"""
-        self.value_label.config(text=f'${value:,.2f}')
+        self.value_label.configure(text=f'${value:,.0f}') # 整數顯示
         if trend:
-            self.trend_label.config(text=trend)
+            self.trend_label.configure(text=trend)
 
 
-class ModernButton(tk.Button):
+class ModernButton(ctk.CTkButton):
     """現代化按鈕元件"""
     
     def __init__(self, parent, text='', style='primary', icon=None, **kwargs):
@@ -78,97 +69,69 @@ class ModernButton(tk.Button):
         else:
             display_text = text
         
-        # 根據樣式設定顏色
-        if style == 'primary':
-            bg = COLORS['primary']
-            fg = '#ffffff'
-            active_bg = COLORS['primary_dark']
-        elif style == 'success':
-            bg = COLORS['success']
-            fg = '#ffffff'
-            active_bg = '#059669'
-        elif style == 'danger':
-            bg = COLORS['danger']
-            fg = '#ffffff'
-            active_bg = '#dc2626'
-        else:  # secondary
-            bg = COLORS['bg_secondary']
-            fg = COLORS['text_primary']
-            active_bg = COLORS['border']
+        # 取得樣式設定
+        btn_style = BUTTON_STYLES.get(style, BUTTON_STYLES['primary'])
+        
+        border_width = btn_style.get('border_width', 0)
+        border_color = btn_style.get('border_color', None)
+        
+        # 處理自定義高度
+        height = kwargs.pop('height', 36)
+        anchor = btn_style.get('anchor', 'center')
         
         super().__init__(
             parent,
             text=display_text,
-            bg=bg,
-            fg=fg,
-            activebackground=active_bg,
-            activeforeground=fg,
-            font=FONTS['body'],
-            relief='flat',
+            fg_color=btn_style['fg_color'],
+            text_color=btn_style['text_color'],
+            hover_color=btn_style['hover_color'],
+            font=(FONTS['body'][0], 14),
+            corner_radius=8,
+            height=height,
+            anchor=anchor,
+            border_width=border_width,
+            border_color=border_color,
             cursor='hand2',
-            padx=PADDING['normal'],
-            pady=SPACING['sm'],
             **kwargs
         )
-        
-        # 綁定懸停效果
-        self.default_bg = bg
-        self.hover_bg = active_bg
-        
-        self.bind('<Enter>', self._on_enter)
-        self.bind('<Leave>', self._on_leave)
-    
-    def _on_enter(self, event):
-        self.config(bg=self.hover_bg)
-    
-    def _on_leave(self, event):
-        self.config(bg=self.default_bg)
 
 
-class SectionFrame(tk.Frame):
+class SectionFrame(ctk.CTkFrame):
     """區塊框架（帶標題）"""
     
     def __init__(self, parent, title='', icon=None, **kwargs):
-        super().__init__(parent, bg=COLORS['bg_primary'], **kwargs)
+        super().__init__(parent, fg_color=COLORS['bg_card'], corner_radius=10, **kwargs)
+        
+        # 即使內容是白色，背景也是白色，這裡做一個內部 padding 容器
+        self.grid_columnconfigure(0, weight=1)
         
         # 標題列
-        header = tk.Frame(self, bg=COLORS['bg_primary'])
-        header.pack(fill=tk.X, pady=(0, SPACING['md']))
-        
-        # 標題文字
-        title_text = f"{ICONS.get(icon, '')} {title}" if icon else title
-        title_label = tk.Label(
-            header,
-            text=title_text,
-            font=FONTS['heading'],
-            bg=COLORS['bg_primary'],
-            fg=COLORS['text_primary']
+        header_text = f"{ICONS.get(icon, '')} {title}" if icon else title
+        self.title_label = ctk.CTkLabel(
+            self,
+            text=header_text,
+            font=(FONTS['heading'][0], 16, 'bold'),
+            text_color=COLORS['text_primary'],
+            anchor='w'
         )
-        title_label.pack(side=tk.LEFT)
+        self.title_label.pack(fill='x', padx=PADDING['normal'], pady=(PADDING['normal'], SPACING['sm']))
         
         # 內容框架
-        self.content = tk.Frame(
-            self,
-            bg=COLORS['bg_card'],
-            relief='solid',
-            borderwidth=1,
-            bd=0,
-            highlightthickness=1,
-            highlightbackground=COLORS['border']
-        )
-        self.content.pack(fill=tk.BOTH, expand=True)
-        
-        # 內部填充
-        self.inner = tk.Frame(self.content, bg=COLORS['bg_card'])
-        self.inner.pack(fill=tk.BOTH, expand=True, padx=PADDING['loose'], pady=PADDING['loose'])
+        self.content = ctk.CTkFrame(self, fg_color=COLORS['bg_card'])
+        self.content.pack(fill='both', expand=True, padx=PADDING['normal'], pady=(0, PADDING['normal']))
 
 
-class StyledLabel(tk.Label):
+class StyledLabel(ctk.CTkLabel):
     """樣式化標籤"""
     
     def __init__(self, parent, text='', style='body', color='primary', **kwargs):
-        font = FONTS.get(style, FONTS['body'])
-        
+        # 字體適配
+        f_info = FONTS.get(style, FONTS['body'])
+        font_tuple = (f_info[0], f_info[1])
+        if len(f_info) > 2:
+            font_tuple = (f_info[0], f_info[1], f_info[2])
+            
+        # 顏色適配
         if color == 'primary':
             fg = COLORS['text_primary']
         elif color == 'secondary':
@@ -183,9 +146,8 @@ class StyledLabel(tk.Label):
         super().__init__(
             parent,
             text=text,
-            font=font,
-            fg=fg,
-            bg=COLORS['bg_primary'],
+            font=font_tuple,
+            text_color=fg,
             **kwargs
         )
 
@@ -193,19 +155,19 @@ class StyledLabel(tk.Label):
 def create_separator(parent, orient='horizontal'):
     """建立分隔線"""
     if orient == 'horizontal':
-        sep = tk.Frame(parent, height=1, bg=COLORS['border'])
-        sep.pack(fill=tk.X, pady=SPACING['md'])
+        sep = ctk.CTkFrame(parent, height=2, fg_color=COLORS['border'])
+        sep.pack(fill='x', pady=SPACING['md'])
     else:
-        sep = tk.Frame(parent, width=1, bg=COLORS['border'])
-        sep.pack(fill=tk.Y, padx=SPACING['md'])
+        sep = ctk.CTkFrame(parent, width=2, fg_color=COLORS['border'])
+        sep.pack(fill='y', padx=SPACING['md'])
     return sep
 
 
-class DateSelector(tk.Frame):
-    """年月日選擇器元件"""
+class DateSelector(ctk.CTkFrame):
+    """年月日選擇器元件 (CTk Version)"""
     
     def __init__(self, parent, initial_date=None, on_date_change=None, **kwargs):
-        super().__init__(parent, bg=COLORS['bg_primary'], **kwargs)
+        super().__init__(parent, fg_color=None, **kwargs)
         
         self.on_date_change = on_date_change
         
@@ -213,35 +175,39 @@ class DateSelector(tk.Frame):
         current_date = initial_date if initial_date else datetime.now()
         
         # 年份 Combobox
-        self.year_var = tk.StringVar(value=str(current_date.year))
-        self.year_combo = ttk.Combobox(self, textvariable=self.year_var, width=5, state="readonly")
-        self.year_combo['values'] = [str(y) for y in range(2018, 2101)]
-        self.year_combo.pack(side=tk.LEFT)
-        tk.Label(self, text="年", bg=COLORS['bg_primary']).pack(side=tk.LEFT, padx=(2, 5))
+        self.year_var = ctk.StringVar(value=str(current_date.year))
+        years = [str(y) for y in range(2018, 2101)]
+        self.year_combo = ctk.CTkComboBox(
+            self, variable=self.year_var, values=years, width=80, 
+            command=self._update_days, state="readonly"
+        )
+        self.year_combo.pack(side=tk.LEFT, padx=(0, 2))
+        ctk.CTkLabel(self, text="年", width=20).pack(side=tk.LEFT)
         
         # 月份 Combobox
-        self.month_var = tk.StringVar(value=str(current_date.month))
-        self.month_combo = ttk.Combobox(self, textvariable=self.month_var, width=3, state="readonly")
-        self.month_combo['values'] = [str(m) for m in range(1, 13)]
-        self.month_combo.pack(side=tk.LEFT)
-        tk.Label(self, text="月", bg=COLORS['bg_primary']).pack(side=tk.LEFT, padx=(2, 5))
+        self.month_var = ctk.StringVar(value=str(current_date.month))
+        months = [str(m) for m in range(1, 13)]
+        self.month_combo = ctk.CTkComboBox(
+            self, variable=self.month_var, values=months, width=60,
+            command=self._update_days, state="readonly"
+        )
+        self.month_combo.pack(side=tk.LEFT, padx=(5, 2))
+        ctk.CTkLabel(self, text="月", width=20).pack(side=tk.LEFT)
         
         # 日期 Combobox
-        self.day_var = tk.StringVar(value=str(current_date.day))
-        self.day_combo = ttk.Combobox(self, textvariable=self.day_var, width=3, state="readonly")
-        self.day_combo['values'] = [str(d) for d in range(1, 32)]
-        self.day_combo.pack(side=tk.LEFT)
-        tk.Label(self, text="日", bg=COLORS['bg_primary']).pack(side=tk.LEFT, padx=(2, 0))
-        
-        # 綁定事件
-        self.year_combo.bind('<<ComboboxSelected>>', self._update_days)
-        self.month_combo.bind('<<ComboboxSelected>>', self._update_days)
-        self.day_combo.bind('<<ComboboxSelected>>', self._notify_change)
+        self.day_var = ctk.StringVar(value=str(current_date.day))
+        days = [str(d) for d in range(1, 32)]
+        self.day_combo = ctk.CTkComboBox(
+            self, variable=self.day_var, values=days, width=60,
+            command=self._notify_change, state="readonly"
+        )
+        self.day_combo.pack(side=tk.LEFT, padx=(5, 2))
+        ctk.CTkLabel(self, text="日", width=20).pack(side=tk.LEFT)
         
         # 初始化天數
-        self._update_days()
+        # self._update_days() # CTkComboBox command might be triggered on set? No.
     
-    def _update_days(self, event=None):
+    def _update_days(self, selection=None):
         """根據年月更新天數"""
         try:
             year = int(self.year_var.get())
@@ -251,7 +217,8 @@ class DateSelector(tk.Frame):
             _, max_day = calendar.monthrange(year, month)
             
             # 更新日期選項
-            self.day_combo['values'] = [str(d) for d in range(1, max_day + 1)]
+            new_values = [str(d) for d in range(1, max_day + 1)]
+            self.day_combo.configure(values=new_values)
             
             # 檢查當前選擇是否有效
             current_day = int(self.day_var.get())
@@ -262,7 +229,7 @@ class DateSelector(tk.Frame):
         except ValueError:
             pass
             
-    def _notify_change(self, event=None):
+    def _notify_change(self, selection=None):
         """通知外部日期變更"""
         if self.on_date_change:
             self.on_date_change(self.get_date_string())
@@ -284,7 +251,7 @@ class DateSelector(tk.Frame):
             self.year_var.set(str(date_obj.year))
             self.month_var.set(str(date_obj.month))
             self.day_var.set(str(date_obj.day))
-            self._update_days()
-            self._notify_change()
+            self._update_days() # Update values list logic
+            # self._notify_change() # Do not notify on programmatic set to avoid loops? Or yes? Usually yes.
         except ValueError:
             pass

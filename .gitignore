@@ -24,7 +24,6 @@ wheels/
 *.db
 *.sqlite
 *.sqlite3
-test_*.db
 
 # IDE
 .vscode/
@@ -44,3 +43,31 @@ Thumbs.db
 .venv
 env/
 venv/
+
+# Backup directory
+backup/
+
+# ===================================
+# 開發工具腳本（保留在本地，不上傳）
+# ===================================
+check_db.py
+check_program.py
+cleanup.py
+setup_check.py
+run_tests.py
+test_*.py
+
+# ===================================
+# 舊版備份檔案（保留在本地，不上傳）
+# ===================================
+gui/main_window_backup_classic.py
+gui/improved_dialog.py
+gui/report_window.py
+
+# ===================================
+# 舊文件（已整合至 DEVELOPMENT_LOG.md）
+# ===================================
+FIXES_SUMMARY.md
+CLAUDE.md
+PYTHON_HELP.md
+quick_start.md
